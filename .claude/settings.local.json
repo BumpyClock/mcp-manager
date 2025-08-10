@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:code.visualstudio.com)",
+      "Bash(mkdir:*)"
+    ],
+    "deny": []
+  }
+}
