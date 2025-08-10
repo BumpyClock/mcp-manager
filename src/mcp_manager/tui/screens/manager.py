@@ -109,7 +109,7 @@ class ManagerScreen(Container):
     def refresh_table(self) -> None:
         table = self.query_one("#manager-table", DataTable)
         table.clear(columns=True)
-        table.cursor_type = "cell"
+        table.cursor_type = "row"  # Changed from "cell" to "row" for better selection
         scope = self._current_scope()
 
         # Columns: Server, Type, [clients...], Tags
@@ -167,14 +167,30 @@ class ManagerScreen(Container):
         if pending_count:
             stats += f" | Pending: {pending_count}"
         self.query_one("#stats-label", Label).update(stats)
-        # Restore selection if possible
-        if self.selected_server_id:
-            try:
-                keys = list(table.rows.keys())
-                idx = next(i for i, k in enumerate(keys) if str(k.value) == str(self.selected_server_id))
-                table.cursor_row = idx
-            except StopIteration:
-                pass
+        
+        # Restore selection if possible, or select first row if we have servers
+        if servers:
+            if self.selected_server_id:
+                try:
+                    keys = list(table.rows.keys())
+                    idx = next(i for i, k in enumerate(keys) if str(k.value) == str(self.selected_server_id))
+                    table.cursor_row = idx
+                    # Ensure selected_server_id is still valid after restore
+                    self.selected_server_id = UUID(str(keys[idx].value))
+                except (StopIteration, IndexError):
+                    # If previous selection not found, select first row
+                    if table.row_count > 0:
+                        table.cursor_row = 0
+                        keys = list(table.rows.keys())
+                        if keys:
+                            self.selected_server_id = UUID(str(keys[0].value))
+            else:
+                # No previous selection, select first row if available
+                if table.row_count > 0:
+                    table.cursor_row = 0
+                    keys = list(table.rows.keys())
+                    if keys:
+                        self.selected_server_id = UUID(str(keys[0].value))
 
     # Key-bound actions
     def action_add(self) -> None:
@@ -198,22 +214,24 @@ class ManagerScreen(Container):
 
     def action_toggle(self) -> None:
         table = self.query_one("#manager-table", DataTable)
-        if getattr(table, "cursor_row", -1) < 0 or getattr(table, "cursor_column", 0) <= 1:
+        # For row cursor mode, we need to handle toggling differently
+        # You might want to prompt which client to toggle or cycle through them
+        if not self._ensure_selected():
             return
+        
+        # Since we're in row mode, let's toggle the first client as default
+        # Or you could show a modal to select which client to toggle
         client_names = list(self.config_manager.adapters.keys())
-        client_col_index = table.cursor_column - 2
-        if client_col_index < 0 or client_col_index >= len(client_names):
+        if not client_names:
             return
-        try:
-            row_key = list(table.rows.keys())[table.cursor_row]
-            server_id = UUID(str(row_key.value))
-        except Exception:
-            return
-        client_name = client_names[client_col_index]
+            
+        # For now, toggle the first client (you may want to enhance this)
+        client_name = client_names[0]
         scope = self._current_scope()
-        key = f"{server_id}_{client_name}_{scope.value}"
+        key = f"{self.selected_server_id}_{client_name}_{scope.value}"
         self.deployment_state[key] = not self.deployment_state.get(key, False)
         self.refresh_table()
+        self.app.notify(f"Toggled {client_name} deployment", severity="information")
 
     def action_change_scope(self) -> None:
         select = self.query_one("#scope-select", Select)

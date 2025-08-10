@@ -1,4 +1,5 @@
 # MCP Manager
+THIS IS A WIP
 
 A powerful TUI/CLI application for centralized management of Model Context Protocol (MCP) servers across multiple AI client applications.
 
