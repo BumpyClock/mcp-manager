@@ -13,11 +13,11 @@ class DashboardScreen(Container):
     """Dashboard screen showing overview and quick actions."""
 
     BINDINGS = [
-        Binding("a", "add_server", "Add Server", show=False),
-        Binding("e", "edit_server", "Edit", show=False),
-        Binding("d", "deploy_server", "Deploy", show=False),
-        Binding("x", "delete_server", "Delete", show=False),
-        Binding("r", "refresh", "Refresh", show=False),
+        Binding("a", "add_server", "Add", show=True),
+        Binding("e", "edit_server", "Edit", show=True),
+        Binding("d", "deploy_server", "Deploy", show=True),
+        Binding("x", "delete_server", "Delete", show=True),
+        Binding("r", "refresh", "Refresh", show=True),
     ]
 
     def __init__(self, config_manager: ConfigManager):
@@ -45,19 +45,6 @@ class DashboardScreen(Container):
                 Static("🖥️ Server Overview", classes="section-title"),
                 DataTable(id="dashboard-table", show_cursor=True),
                 classes="servers-overview-section",
-            ),
-            Container(
-                Static("⚡ Quick Actions", classes="section-title"),
-                Horizontal(
-                    Button("Add Server [a]", id="btn-add-server", variant="primary"),
-                    Button("Edit [e]", id="btn-edit-server"),
-                    Button("Deploy [d]", id="btn-deploy-server"),
-                    Button("Delete [x]", id="btn-delete-server", variant="error"),
-                    Button("Sync All", id="btn-sync-all"),
-                    Button("Refresh [r]", id="btn-refresh"),
-                    classes="actions-row",
-                ),
-                classes="actions-section",
             ),
             Container(
                 Static("💡 Tips", classes="section-title"),
@@ -154,6 +141,10 @@ class DashboardScreen(Container):
         from uuid import UUID
         if event.row_key:
             self.selected_server_id = UUID(str(event.row_key.value))
+            try:
+                self.app.set_selected_server(self.selected_server_id)  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -161,52 +152,50 @@ class DashboardScreen(Container):
         from uuid import UUID
         if event.row_key:
             self.selected_server_id = UUID(str(event.row_key.value))
+            try:
+                self.app.set_selected_server(self.selected_server_id)  # type: ignore[attr-defined]
+            except Exception:
+                pass
             # Go to servers tab for detailed view
             self.app.action_switch_tab("servers")
 
-    @on(Button.Pressed)
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events."""
-        button_id = event.button.id
+    # No on_button_pressed: rely on keybindings shown in footer
 
-        if button_id == "btn-add-server":
-            self.app.action_switch_tab("servers")
-            
-        elif button_id == "btn-edit-server":
-            if not self.selected_server_id:
-                self.app.notify("Please select a server first", severity="warning")
-                return
-            # Switch to servers tab - the selection will be maintained
-            self.app.action_switch_tab("servers")
-            
-        elif button_id == "btn-deploy-server":
-            if not self.selected_server_id:
-                self.app.notify("Please select a server first", severity="warning")
-                return
-            self.app.action_switch_tab("deploy")
-            
-        elif button_id == "btn-delete-server":
-            if not self.selected_server_id:
-                self.app.notify("Please select a server first", severity="warning")
-                return
-            server = self.config_manager.get_server(self.selected_server_id)
-            if server:
-                self.config_manager.delete_server(self.selected_server_id)
-                self.app.notify(f"Server '{server.name}' deleted", severity="information")
-                self.refresh_dashboard()
-                
-        elif button_id == "btn-sync-all":
-            results = self.config_manager.sync_all()
-            self.app.notify("Sync completed", severity="information")
-            self.refresh_dashboard()
-            
-        elif button_id == "btn-refresh":
-            self.refresh_dashboard()
-            self.app.notify("Dashboard refreshed", severity="information")
-
+    # Key-bound actions
     def action_add_server(self) -> None:
         """Add a new server."""
         self.app.action_switch_tab("servers")
+
+    def action_edit_server(self) -> None:
+        """Edit selected server."""
+        if not self.selected_server_id:
+            self.app.notify("Please select a server first", severity="warning")
+            return
+        self.app.action_switch_tab("servers")
+
+    def action_deploy_server(self) -> None:
+        """Deploy selected server."""
+        if not self.selected_server_id:
+            self.app.notify("Please select a server first", severity="warning")
+            return
+        self.app.action_switch_tab("deploy")
+
+    def action_delete_server(self) -> None:
+        """Delete selected server."""
+        if not self.selected_server_id:
+            self.app.notify("Please select a server first", severity="warning")
+            return
+        server = self.config_manager.get_server(self.selected_server_id)
+        if server:
+            # Could add confirmation dialog here
+            self.config_manager.delete_server(self.selected_server_id)
+            self.app.notify(f"Server '{server.name}' deleted", severity="information")
+            self.refresh_dashboard()
+
+    def action_refresh(self) -> None:
+        """Refresh the dashboard."""
+        self.refresh_dashboard()
+        self.app.notify("Dashboard refreshed", severity="information")
 
     def action_edit_server(self) -> None:
         """Edit selected server."""

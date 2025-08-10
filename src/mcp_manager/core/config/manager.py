@@ -200,3 +200,17 @@ class ConfigManager:
                 results[client_name] = {"error": [str(e)]}
 
         return results
+
+    # Settings operations
+    def set_setting(self, key: str, value):
+        self.storage.set_setting(key, value)
+
+    def get_setting(self, key: str, default=None):
+        return self.storage.get_setting(key, default)
+
+    def set_settings(self, values: Dict[str, object]) -> None:
+        for k, v in values.items():
+            self.set_setting(k, v)
+
+    def get_settings(self) -> Dict[str, object]:
+        return self.storage.get_all_settings()

@@ -78,6 +78,48 @@ class Storage:
             """
             )
 
+    # Settings operations
+    def set_setting(self, key: str, value: Any) -> None:
+        """Persist a single setting as JSON string."""
+        import json as _json
+        from datetime import datetime as _dt
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+                """,
+                (key, _json.dumps(value), _dt.now().isoformat()),
+            )
+
+    def get_setting(self, key: str, default: Any | None = None) -> Any:
+        """Retrieve a single setting, parsed from JSON."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cur.fetchone()
+            if not row:
+                return default
+            try:
+                return json.loads(row["value"])  # type: ignore[name-defined]
+            except Exception:
+                return row["value"]
+
+    def get_all_settings(self) -> Dict[str, Any]:
+        """Return all settings as a dict."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute("SELECT key, value FROM settings")
+            out: Dict[str, Any] = {}
+            for row in cur.fetchall():
+                try:
+                    out[row["key"]] = json.loads(row["value"])  # type: ignore[name-defined]
+                except Exception:
+                    out[row["key"]] = row["value"]
+            return out
+
     def add_server(self, server: MCPServer) -> None:
         """Add a new server to storage."""
         with sqlite3.connect(self.db_path) as conn:

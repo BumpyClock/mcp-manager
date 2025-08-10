@@ -47,11 +47,11 @@ class HelpScreen(ModalScreen):
                 Container(
                     Static("Global Shortcuts", classes="subsection-title"),
                     Label("Ctrl+Q - Quit application"),
-                    Label("Ctrl+S - Save changes"),
-                    Label("F1 or ? - Show this help"),
+                    Label("? - Show this help"),
                     Label("Ctrl+R - Refresh current view"),
+                    Label("F1–F4 - Switch between tabs"),
                     Label("Tab - Navigate between panels"),
-                    Label("1-5 - Quick jump to tabs"),
+                    Label("1–4 - Quick jump to tabs"),
                     classes="help-section",
                 ),
                 
@@ -80,17 +80,14 @@ class HelpScreen(ModalScreen):
                     Static("Deployment", classes="subsection-title"),
                     Label("Use arrow keys to navigate the matrix"),
                     Label("Space - Toggle deployment"),
-                    Label("s - Change scope"),
+                    Label("s - Cycle scope"),
                     Label("Enter - Apply changes"),
                     classes="help-section",
                 ),
                 
                 Container(
-                    Static("Client Management", classes="subsection-title"),
-                    Label("r - Refresh client status"),
-                    Label("s - Sync selected client"),
-                    Label("a - Sync all clients"),
-                    Label("v - View client details"),
+                    Static("Client Status", classes="subsection-title"),
+                    Label("Open from Deploy: c - Client Status modal"),
                     classes="help-section",
                 ),
                 
@@ -101,6 +98,13 @@ class HelpScreen(ModalScreen):
                     Label("• Use tags to organize your servers"),
                     Label("• Different scopes (global/project) allow flexible deployment"),
                     Label("• Sync regularly to keep configurations in sync"),
+                    classes="help-section",
+                ),
+
+                Container(
+                    Static("Settings", classes="subsection-title"),
+                    Label("Ctrl+S - Save settings"),
+                    Label("Shift+R - Reset to defaults"),
                     classes="help-section",
                 ),
                 

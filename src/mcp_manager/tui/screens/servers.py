@@ -5,6 +5,7 @@ from uuid import UUID
 
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, Select, Static, TextArea
@@ -154,6 +155,14 @@ class AddServerModal(ModalScreen):
 class ServersScreen(Container):
     """Servers management screen."""
 
+    BINDINGS = [
+        Binding("a", "add", "Add", show=True),
+        Binding("e", "edit", "Edit", show=True),
+        Binding("d", "delete", "Delete", show=True),
+        Binding("p", "deploy", "Deploy", show=True),
+        Binding("r", "refresh", "Refresh", show=True),
+    ]
+
     def __init__(self, config_manager: ConfigManager):
         """Initialize servers screen."""
         super().__init__()
@@ -165,13 +174,6 @@ class ServersScreen(Container):
         yield Vertical(
             Container(
                 Static("🖥️ Server Management", classes="section-title"),
-                Horizontal(
-                    Button("Add Server [a]", id="btn-add", variant="primary"),
-                    Button("Edit [e]", id="btn-edit"),
-                    Button("Delete [d]", id="btn-delete", variant="error"),
-                    Button("Deploy [p]", id="btn-deploy-server"),
-                    classes="toolbar",
-                ),
                 classes="header-section",
             ),
             Container(
@@ -260,13 +262,16 @@ Deployments:
             details += "  • Not deployed\n"
 
         self.query_one("#server-details", Label).update(details)
+        # Update app-level selection for cross-tab sync
+        try:
+            self.app.set_selected_server(self.selected_server_id)  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
-    @on(Button.Pressed, "#btn-add")
     def add_server(self) -> None:
         """Open add server modal."""
         self.app.push_screen(AddServerModal(self.config_manager), self.on_modal_close)
 
-    @on(Button.Pressed, "#btn-edit")
     def edit_server(self) -> None:
         """Edit selected server."""
         if not self.selected_server_id:
@@ -279,7 +284,6 @@ Deployments:
                 AddServerModal(self.config_manager, server), self.on_modal_close
             )
 
-    @on(Button.Pressed, "#btn-delete")
     def delete_server(self) -> None:
         """Delete selected server."""
         if not self.selected_server_id:
@@ -294,7 +298,6 @@ Deployments:
             self.refresh_table()
             self.query_one("#server-details", Label).update("Select a server to view details")
 
-    @on(Button.Pressed, "#btn-deploy-server")
     def deploy_server(self) -> None:
         """Deploy selected server."""
         if not self.selected_server_id:
@@ -308,3 +311,33 @@ Deployments:
         """Handle modal close."""
         if result:
             self.refresh_table()
+
+    # External selection sync
+    def select_server_by_id(self, server_id_str: str) -> None:
+        table = self.query_one("#servers-table", DataTable)
+        try:
+            keys = list(table.rows.keys())
+            target_index = next(i for i, k in enumerate(keys) if str(k.value) == server_id_str)
+            table.cursor_row = target_index
+            # Trigger details update
+            from uuid import UUID
+            self.selected_server_id = UUID(server_id_str)
+            self.update_details()
+        except StopIteration:
+            pass
+
+    # Key-bound actions
+    def action_add(self) -> None:
+        self.add_server()
+
+    def action_edit(self) -> None:
+        self.edit_server()
+
+    def action_delete(self) -> None:
+        self.delete_server()
+
+    def action_deploy(self) -> None:
+        self.deploy_server()
+
+    def action_refresh(self) -> None:
+        self.refresh_table()
