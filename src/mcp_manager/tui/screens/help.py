@@ -49,9 +49,10 @@ class HelpScreen(ModalScreen):
                     Label("Ctrl+Q - Quit application"),
                     Label("? - Show this help"),
                     Label("Ctrl+R - Refresh current view"),
-                    Label("F1–F4 - Switch between tabs"),
+                    Label("F1–F2 - Switch between tabs (Manager/Settings)"),
+                    Label("Manager: Space Toggle, s Scope, Enter Apply, a Add, e Edit, x Delete, t Toggle columns"),
+                    Label("Use Type/Tag filters above the table"),
                     Label("Tab - Navigate between panels"),
-                    Label("1–4 - Quick jump to tabs"),
                     classes="help-section",
                 ),
                 

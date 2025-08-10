@@ -4,6 +4,8 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Checkbox, Input, Label, Select, Static
 from textual.binding import Binding
+from textual.screen import ModalScreen
+from typing import Callable
 
 from mcp_manager.core.config.manager import ConfigManager
 
@@ -106,7 +108,11 @@ class SettingsScreen(Container):
         self.app.notify("Settings saved", severity="success")
 
     def action_reset_settings(self) -> None:
-        """Reset settings to defaults."""
+        """Prompt to confirm reset to defaults."""
+        self.app.push_screen(ResetConfirmModal(self._confirm_reset))
+
+    def _confirm_reset(self) -> None:
+        """Perform reset to default values and persist."""
         # Reset UI elements to default values
         self.query_one("#auto-sync", Checkbox).value = True
         self.query_one("#auto-backup", Checkbox).value = True
@@ -115,7 +121,7 @@ class SettingsScreen(Container):
         self.query_one("#theme-select", Select).value = "dark"
         self.query_one("#show-hints", Checkbox).value = True
         self.query_one("#compact-mode", Checkbox).value = False
-        
+
         # Persist defaults
         self.config_manager.set_settings(
             {
@@ -133,3 +139,30 @@ class SettingsScreen(Container):
         except Exception:
             pass
         self.app.notify("Settings reset to defaults", severity="information")
+
+
+class ResetConfirmModal(ModalScreen):
+    """Small confirmation modal for settings reset."""
+
+    CSS = """
+    ResetConfirmModal { align: center middle; }
+    #dialog { width: 60; height: auto; border: round $warning; padding: 1 2; background: $surface; }
+    """
+
+    def __init__(self, on_confirm: Callable[[], None]):
+        super().__init__()
+        self._on_confirm = on_confirm
+
+    def compose(self) -> ComposeResult:
+        with Container(id="dialog"):
+            yield Static("Reset all settings to defaults?\n[Y] Yes    [N/Esc] No")
+
+    def on_key(self, event) -> None:  # type: ignore[override]
+        key = getattr(event, "key", "").lower()
+        if key in ("y", "enter"):
+            try:
+                self._on_confirm()
+            finally:
+                self.dismiss()
+        elif key in ("n", "escape"):
+            self.dismiss()

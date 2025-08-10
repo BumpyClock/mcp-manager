@@ -11,9 +11,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, TabbedContent, TabPane
 
 from mcp_manager.core.config.manager import ConfigManager
-from mcp_manager.tui.screens.dashboard import DashboardScreen
-from mcp_manager.tui.screens.servers import ServersScreen
-from mcp_manager.tui.screens.deploy import DeployScreen
+from mcp_manager.tui.screens.manager import ManagerScreen
 from mcp_manager.tui.screens.settings import SettingsScreen
 
 
@@ -49,6 +47,12 @@ class MCPManagerApp(App):
     .help-section { padding: 0 1; }
     .behavior-section, .backup-section, .ui-section, .about-section { padding: 0 1; }
 
+    /* Manager filter bar */
+    #filter-bar { height: 1; padding: 0 1; color: $text 70%; }
+    #filter-bar Label { padding: 0 1; }
+    #filter-bar Select { height: 1; }
+    #filter-bar > Label#stats-label { dock: right; color: $text 80%; padding-right: 0; }
+
     /* Dashboard stats */
     .stats-row { }
     .stats-row .stat-card { margin-right: 1; }
@@ -74,15 +78,9 @@ class MCPManagerApp(App):
         Binding("?", "help", "Help", show=True),
         Binding("ctrl+s", "save", "Save", show=False),
         Binding("ctrl+r", "refresh", "Refresh", show=True),
-        # Quick tab switching (consolidated: no Clients tab)
-        Binding("f1", "switch_tab('dashboard')", "Dashboard", show=True),
-        Binding("f2", "switch_tab('servers')", "Servers", show=True),
-        Binding("f3", "switch_tab('deploy')", "Deploy", show=True),
-        Binding("f4", "switch_tab('settings')", "Settings", show=True),
-        Binding("1", "switch_tab('dashboard')", "Dashboard", show=False),
-        Binding("2", "switch_tab('servers')", "Servers", show=False),
-        Binding("3", "switch_tab('deploy')", "Deploy", show=False),
-        Binding("4", "switch_tab('settings')", "Settings", show=False),
+        # Two top-level tabs only: Manager, Settings
+        Binding("f1", "switch_tab('manager')", "Manager", show=True),
+        Binding("f2", "switch_tab('settings')", "Settings", show=True),
     ]
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -95,25 +93,18 @@ class MCPManagerApp(App):
         """Compose the application layout."""
         yield Header(id="app-header")
         
-        with TabbedContent(initial="dashboard", id="main-content"):
-            with TabPane("Dashboard", id="dashboard"):
-                self.dashboard_screen = DashboardScreen(self.config_manager)
-                yield self.dashboard_screen
-            
-            with TabPane("Servers", id="servers"):
-                self.servers_screen = ServersScreen(self.config_manager)
-                yield self.servers_screen
-            
-            with TabPane("Deploy", id="deploy"):
-                self.deploy_screen = DeployScreen(self.config_manager)
-                yield self.deploy_screen
-            
+        with TabbedContent(initial="manager", id="main-content"):
+            with TabPane("Manager", id="manager"):
+                self.manager_screen = ManagerScreen(self.config_manager)
+                yield self.manager_screen
+
             with TabPane("Settings", id="settings"):
                 self.settings_screen = SettingsScreen(self.config_manager)
                 yield self.settings_screen
         
         with Horizontal(id="status-bar"):
             yield Label("Ready", id="status-label")
+            yield Label("", id="hint-label")
 
         yield Footer()
 
@@ -143,12 +134,10 @@ class MCPManagerApp(App):
         active = tabbed_content.active
         self.set_status("Refreshing…")
         try:
-            if active == "dashboard":
-                self.dashboard_screen.refresh_dashboard()  # type: ignore[attr-defined]
-            elif active == "servers":
-                self.servers_screen.refresh_table()  # type: ignore[attr-defined]
-            elif active == "deploy":
-                self.deploy_screen.refresh_matrix()  # type: ignore[attr-defined]
+            if active == "manager":
+                self.manager_screen.refresh_active()  # type: ignore[attr-defined]
+            elif active == "settings":
+                pass
         except Exception:
             # Fallback notification on any failure
             pass
@@ -156,22 +145,26 @@ class MCPManagerApp(App):
         self.set_status("Ready")
 
     def action_switch_tab(self, tab_id: str) -> None:
-        """Switch to a specific tab and sync selection if possible."""
+        """Switch to a specific top-level or mapped inner tab."""
+        # Map legacy tab ids to Manager + inner switch
+        legacy = {"dashboard", "servers", "deploy"}
         tabbed_content = self.query_one("#main-content", TabbedContent)
-        tabbed_content.active = tab_id
-        # Attempt selection sync when moving to servers/deploy
-        if getattr(self, "current_selected_server_id", None):
-            sid = self.current_selected_server_id
-            if tab_id == "servers":
+        if tab_id in legacy:
+            tabbed_content.active = "manager"
+            if getattr(self, "current_selected_server_id", None):
                 try:
-                    self.servers_screen.select_server_by_id(sid)  # type: ignore[attr-defined]
+                    self.manager_screen.select_server_by_id(self.current_selected_server_id)  # type: ignore[attr-defined]
                 except Exception:
                     pass
-            elif tab_id == "deploy":
-                try:
-                    self.deploy_screen.select_server_by_id(sid)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+            # Show manager hint for unified table
+            self.set_hint("Manager: Space Toggle • s Scope • Enter Apply • a Add • e Edit • x Delete • t Cols • c Clients")
+        else:
+            tabbed_content.active = tab_id
+            # Clear hint if not Manager
+            if tab_id == "settings":
+                self.set_hint("")
+            elif tab_id == "manager":
+                self.set_hint("Manager: Space Toggle • s Scope • Enter Apply • a Add • e Edit • x Delete • t Cols • c Clients")
 
     def on_mount(self) -> None:
         """Called when app is mounted."""
@@ -190,11 +183,23 @@ class MCPManagerApp(App):
             finally:
                 self.set_status("Ready")
         self.notify("MCP Manager ready", severity="information")
+        # Set initial hint for Manager tab
+        tabbed = self.query_one("#main-content", TabbedContent)
+        if tabbed.active == "manager":
+            self.set_hint("Manager: Space Toggle • s Scope • Enter Apply • a Add • e Edit • x Delete • t Cols • c Clients")
+        else:
+            self.set_hint("")
 
     # Status bar helper
     def set_status(self, text: str) -> None:
         try:
             self.query_one("#status-label", Label).update(text)
+        except Exception:
+            pass
+
+    def set_hint(self, text: str) -> None:
+        try:
+            self.query_one("#hint-label", Label).update(text)
         except Exception:
             pass
 
